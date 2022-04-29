@@ -12,11 +12,18 @@
 # CBL-Mariner is designed to provide a consistent platform for these devices and services and will enhance Microsoft’s
 # ability to stay current on Linux updates.
 # https://github.com/microsoft/CBL-Mariner
-FROM cblmariner2preview.azurecr.io/base/core:2.0
+FROM mcr.microsoft.com/cbl-mariner/base/core:2.0
 
 SHELL ["/bin/bash","-c"]
 
 COPY linux/tdnfinstall.sh .
+
+# Use mariner-repos-microsoft-preview
+# till msodbcsql and sql-tools publish to
+# Mariner 2.0 prod Microsoft repo
+RUN tdnf update -y && bash ./tdnfinstall.sh \
+  mariner-repos-extended \
+  mariner-repos-microsoft-preview
 
 RUN tdnf update -y && bash ./tdnfinstall.sh \
   curl \
@@ -44,16 +51,22 @@ RUN tdnf update -y && bash ./tdnfinstall.sh \
   bash-completion \
   build-essential \
   binutils \
+  ca-certificates \
+  ca-certificates-legacy \
   chkconfig \
   cifs-utils \
+  curl \
   bind-utils \
   dos2unix \
   dotnet-runtime-6.0 \
   dotnet-sdk-6.0 \
+  e2fsprogs \
 # emacs \
   gawk \
   glibc-lang \
   glibc-i18n \
+  grep \
+  gzip \
   initscripts \
   iptables \
   iputils \
@@ -62,6 +75,8 @@ RUN tdnf update -y && bash ./tdnfinstall.sh \
   less \
   libffi \
   libffi-devel \
+  libtool \
+  lz4 \
   openssl \
   openssl-libs \
   openssl-devel \
@@ -70,13 +85,14 @@ RUN tdnf update -y && bash ./tdnfinstall.sh \
 # maven \
   moby-cli \
   moby-engine \
-# msodbcsql17 \
-# mssql-tools \
+  msodbcsql17 \
+  mssql-tools \
   mysql \
   nano \
   net-tools \
   parallel \
   patch \
+  pkg-config \
   postgresql-libs \
   postgresql \
   python3 \
@@ -85,32 +101,19 @@ RUN tdnf update -y && bash ./tdnfinstall.sh \
   python3-libs \
   python3-devel \
   puppet \
+  rpm \
   rsync \
-  ca-certificates \
-  ca-certificates-legacy \
+  sed \
+  sudo \
+  tar \
   tmux \
   unixODBC \
   unzip \
+  util-linux \
   vim \
   wget \
   zip \
   zsh
-
-# Install the deprecated Python2 packages. Will be removed in a future update
-RUN bash ./tdnfinstall.sh \
-  python2 \
-  python2-libs \
-  python2-devel
-
-# Install msodbcsql17 from packages.microsoft.com
-RUN wget -nv -O msodbcsql17.rpm https://packages.microsoft.com/yumrepos/microsoft-rhel8.0-prod/msodbcsql17-17.9.1.1-1.x86_64.rpm \
-  && ACCEPT_EULA=Y rpm -ivh msodbcsql17.rpm \
-  && rm -rf msodbcsql17.rpm
-
-# Install mssql-tools from packages.microsoft.com
-RUN wget -nv -O mssql-tools.rpm https://packages.microsoft.com/yumrepos/microsoft-rhel8.0-prod/mssql-tools-17.9.1.1-1.x86_64.rpm \
-  && ACCEPT_EULA=Y rpm -ivh mssql-tools.rpm \
-  && rm -rf mssql-tools.rpm
 
 # Install azure-functions-core-tools
 RUN wget -nv -O Azure.Functions.Cli.linux-x64.4.0.3971.zip https://github.com/Azure/azure-functions-core-tools/releases/download/4.0.3971/Azure.Functions.Cli.linux-x64.4.0.3971.zip \
@@ -163,7 +166,7 @@ RUN curl -fSsL `curl -fSsL https://api.github.com/repos/Azure/batch-shipyard/rel
   && cd /opt/batch-shipyard \
   && sed 's/rhel/mariner/' < install.sh > install-tweaked.sh \
   && sed -i '/$PYTHON == /s/".*"/"python3"/' install-tweaked.sh \
-  && sed 's/python-devel/python3-devel/' install-tweaked.sh \
+  && sed -i 's/rsync $PYTHON_PKGS/rsync python3-devel/' install-tweaked.sh \
   && chmod +x ./install-tweaked.sh \
   && ./install-tweaked.sh -c \
   && /bin/bash -c "source cloudshell/bin/activate && python3 -m compileall -f /opt/batch-shipyard/shipyard.py /opt/batch-shipyard/convoy && deactivate" \
@@ -191,13 +194,6 @@ RUN export INSTALLROOT=/usr/local/linkerd \
   && curl -sSL https://run.linkerd.io/install | sh - 
 ENV PATH $PATH:/usr/local/linkerd/bin
 
-# Install Puppet-Bolt
-# RUN wget -nv -O puppet-tools.deb https://apt.puppet.com/puppet-tools-release-buster.deb \
-#  && dpkg -i puppet-tools.deb \
-#  && apt-get update \
-#  && bash ./aptinstall.sh puppet-bolt \
-#  && rm -f puppet-tools.deb
-
 # install go
 RUN bash ./tdnfinstall.sh \
   golang
@@ -210,12 +206,11 @@ RUN export INSTALL_DIRECTORY="$GOROOT/bin" \
   && ln -sf INSTALL_DIRECTORY/dep /usr/bin/dep \
   && unset INSTALL_DIRECTORY
 
-RUN gem update --system 2.7.7 \
+RUN gem update --system 3.3.3 \
   && gem install bundler --version 1.16.4 --force \
   && gem install rake --version 12.3.0 --no-document --force \
   && gem install colorize --version 0.8.1 --no-document --force \
-  && gem install rspec --version 3.7.0 --no-document --force \
-  && rm -r /root/.gem/
+  && gem install rspec --version 3.7.0 --no-document --force
 
 ENV GEM_HOME=~/bundle
 ENV BUNDLE_PATH=~/bundle
@@ -241,9 +236,14 @@ RUN wget -nv -O dcos https://downloads.dcos.io/binaries/cli/linux/x86-64/latest/
   && mv dcos /usr/local/bin \
   && chmod +x /usr/local/bin/dcos
 
+# Work around to use 2.0 preview repo till we get
+# PowerShell back in Mariner 2.0 prod repo
 # Install PowerShell
-RUN bash ./tdnfinstall.sh \
-  powershell
+RUN tdnf -y install mariner-repos-preview
+
+RUN tdnf -y install powershell
+
+RUN tdnf -y remove mariner-repos-preview
 
 # PowerShell telemetry
 ENV POWERSHELL_DISTRIBUTION_CHANNEL CloudShell
@@ -251,10 +251,10 @@ ENV POWERSHELL_DISTRIBUTION_CHANNEL CloudShell
 ENV POWERSHELL_UPDATECHECK Off
 
 # Install Chef Workstation
-RUN wget -nv -O chef-workstation_x86_64.rpm https://packages.chef.io/files/stable/chef-workstation/22.2.807/el/8/chef-workstation-22.2.807-1.el8.x86_64.rpm \
-  && echo 7b93c2826fca17aace7711c759e7cb0d4b7dd8498f9040f6a544c19ffc9ea679 chef-workstation_x86_64.rpm | sha256sum -c \
-  && rpm -ivh chef-workstation_x86_64.rpm \
-  && rm -f chef-workstation_x86_64.rpm
+# RUN wget -nv -O chef-workstation_x86_64.rpm https://packages.chef.io/files/stable/chef-workstation/22.2.807/el/8/chef-workstation-22.2.807-1.el8.x86_64.rpm \
+#  && echo 7b93c2826fca17aace7711c759e7cb0d4b7dd8498f9040f6a544c19ffc9ea679 chef-workstation_x86_64.rpm | sha256sum -c \
+#  && rpm -ivh chef-workstation_x86_64.rpm \
+#  && rm -f chef-workstation_x86_64.rpm
 
 # Install ripgrep
 RUN bash ./tdnfinstall.sh \
