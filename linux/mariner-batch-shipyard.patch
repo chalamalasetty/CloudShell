@@ -1,0 +1,19 @@
+--- install.sh	2019-12-13 13:38:38.000000000 -0800
++++ install-tweaked.sh	2022-03-13 00:18:48.372281898 -0800
+@@ -178,13 +178,13 @@
+         $SUDO apt-get install -y --no-install-recommends \
+             build-essential libssl-dev libffi-dev openssl \
+             openssh-client rsync $PYTHON_PKGS
+-    elif [ "$DISTRIB_ID" == "centos" ] || [ "$DISTRIB_ID" == "rhel" ]; then
++    elif [ "$DISTRIB_ID" == "centos" ] || [ "$DISTRIB_ID" == "rhel" ] || [ "$DISTRIB_ID" == "mariner" ]; then
+         $SUDO yum makecache fast
+         if [ $ANACONDA -eq 1 ]; then
+             PYTHON_PKGS=
+         else
+-            if [ $PYTHON == "python" ]; then
+-                PYTHON_PKGS="python-devel"
++            if [ $PYTHON == "python3" ]; then
++                PYTHON_PKGS="python3-devel"
+             else
+                 if ! yum list installed epel-release; then
+                     echo "epel-release package not installed."
