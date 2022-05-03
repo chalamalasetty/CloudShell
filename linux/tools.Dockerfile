@@ -28,33 +28,9 @@ RUN az aks install-cli \
     && chmod +x /usr/local/bin/kubectl \
     && chmod +x /usr/local/bin/kubelogin
 
-# dirmngr is removed in latest version of gnupg2
-# temporarily downgrade to older version
-# till dirmngr is added to Mariner 2.0
-RUN wget -nv -O gnupg2.rpm https://packages.microsoft.com/cbl-mariner/1.0/prod/base/x86_64/rpms/gnupg2-2.2.20-3.cm1.x86_64.rpm \
-  && ln -sf /usr/lib/libreadline.so.8.1 /usr/lib/libreadline.so.7 \
-  && rpm -Uvh --oldpackage gnupg2.rpm --nodeps \
-  && rm -rf gnupg2.rpm
-
-# Download the latest terraform (AMD64), install to global environment.
-RUN gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys B36CBA91A2C0730C435FC280B0B441097685B676 \
-    && TF_VERSION=$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M ".current_version") \
-    && wget -nv -O terraform.zip https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip \
-    && wget -nv -O terraform.sha256 https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_SHA256SUMS \
-    && wget -nv -O terraform.sha256.sig https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_SHA256SUMS.sig \  
-    && gpg --verify terraform.sha256.sig terraform.sha256 \
-    && echo $(grep -Po "[[:xdigit:]]{64}(?=\s+terraform_${TF_VERSION}_linux_amd64.zip)" terraform.sha256) terraform.zip | sha256sum -c \
-    && unzip terraform.zip \
-    && mkdir /usr/local/terraform \
-    && mv terraform /usr/local/terraform \
-    && rm -f terraform terraform.zip terraform.sha256 terraform.sha256.sig \
-    && unset TF_VERSION
-
-COPY ./linux/terraform/terraform*  /usr/local/bin/
-RUN chmod 755 /usr/local/bin/terraform* && dos2unix /usr/local/bin/terraform*
-
-# upgrade gnupg2
-RUN tdnf update -y gnupg2
+# Install terraform
+RUN tdnf update -y && bash ./tdnfinstall.sh \
+  terraform
 
 # github CLI
 RUN wget -O /etc/yum.repos.d/gh-cli.repo https://cli.github.com/packages/rpm/gh-cli.repo \
